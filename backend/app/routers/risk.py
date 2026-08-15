@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.db.neo4j_client import neo4j_client
-from app.deps import get_current_user
 from app.services.risk import evaluate
 
-router = APIRouter(prefix="/api/risk", tags=["risk"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/api/risk", tags=["risk"])
 
 
 @router.get("/flags")

@@ -11,12 +11,6 @@ export class ApiError extends Error {
   }
 }
 
-let authToken: string | null = null;
-
-export function setAuthToken(token: string | null) {
-  authToken = token;
-}
-
 function detailMessage(body: unknown, fallback: string): string {
   if (typeof body === "object" && body && "detail" in body) {
     const detail = (body as { detail: unknown }).detail;
@@ -40,15 +34,13 @@ export async function api<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (authToken) headers.Authorization = `Bearer ${authToken}`;
     const response = await fetch(`${apiBase()}${path}`, {
       ...init,
       signal: controller.signal,
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers || {}),
+      },
     });
     const text = await response.text();
     let body: unknown = null;
@@ -58,9 +50,6 @@ export async function api<T>(
       body = { detail: text };
     }
     if (!response.ok) {
-      if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/")) {
-        window.dispatchEvent(new Event("narcograph:unauthorized"));
-      }
       throw new ApiError(response.status, detailMessage(body, response.statusText));
     }
     return body as T;

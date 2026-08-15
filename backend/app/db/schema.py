@@ -15,8 +15,6 @@ CONSTRAINTS = [
     "CREATE CONSTRAINT location_key IF NOT EXISTS FOR (l:Location) REQUIRE l.canonical_name IS UNIQUE",
     "CREATE CONSTRAINT seizure_id IF NOT EXISTS FOR (s:Seizure) REQUIRE s.id IS UNIQUE",
     "CREATE CONSTRAINT crawljob_id IF NOT EXISTS FOR (j:CrawlJob) REQUIRE j.id IS UNIQUE",
-    "CREATE CONSTRAINT user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE",
-    "CREATE CONSTRAINT user_email IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE",
 ]
 
 INDEXES = [

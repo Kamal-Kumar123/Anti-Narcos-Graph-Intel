@@ -1,9 +1,8 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from app.db.neo4j_client import neo4j_client
-from app.deps import require_admin
 from app.models.api import EmbedRequest
 from app.models.extraction import IngestResponse, IngestTextRequest
 from app.services import lexicon, vector_store
@@ -11,7 +10,7 @@ from app.services.ingest import ingest_text
 from app.services.llm import get_llm
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/ingest", tags=["ingest"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
 
 @router.post("/text", response_model=IngestResponse)

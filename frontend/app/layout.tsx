@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { AppShell } from "@/components/AppShell";
+import { Nav } from "@/components/Nav";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -20,9 +20,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body>
-        <Providers>
-          <AppShell>{children}</AppShell>
-        </Providers>
+        <div className="shell">
+          <Nav />
+          <main className="main">
+            <Providers>{children}</Providers>
+          </main>
+        </div>
       </body>
     </html>
   );

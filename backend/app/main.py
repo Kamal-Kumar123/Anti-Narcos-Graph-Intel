@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.neo4j_client import neo4j_client
 from app.db.schema import ensure_schema
-from app.routers import ask, auth, graph, health, ingest, risk
+from app.routers import ask, graph, health, ingest, risk
 from app.services.embeddings import embedder
 
 logging.basicConfig(
@@ -26,12 +26,6 @@ async def lifespan(_: FastAPI):
         await ensure_schema()
     except Exception as exc:  # noqa: BLE001
         logger.error("Startup could not initialise Neo4j: %s", exc)
-    if settings.resend_configured:
-        logger.info("OTP email: Resend HTTPS")
-    elif settings.smtp_configured:
-        logger.info("OTP email: SMTP %s as %s", settings.smtp_host, settings.smtp_user)
-    else:
-        logger.warning("OTP email: not configured; codes will be logged only")
     yield
     await embedder.close()
     await neo4j_client.close()
@@ -53,7 +47,6 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
-app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(graph.router)
 app.include_router(ask.router)

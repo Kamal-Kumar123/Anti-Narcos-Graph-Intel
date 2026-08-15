@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { downloadAskDocx } from "@/lib/export-docx";
 import { useWorkspace, type AskResponse } from "@/lib/workspace";
 
@@ -39,8 +38,6 @@ async function waitForJob(id: string, onTick: (job: Job) => void): Promise<Job> 
 }
 
 export default function AskPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
   const { ask, setAsk, setGraph } = useWorkspace();
   const { query, discover, result, error, busy } = ask;
   const pipeline = ask.pipeline;
@@ -68,7 +65,7 @@ export default function AskPage() {
       pipeline: "Checking the knowledge graph…",
     });
     try {
-      let payload = await runAsk(question, isAdmin && discover);
+      let payload = await runAsk(question, discover);
       if (payload.job_id) {
         setAsk({
           pipeline: "Graph evidence is thin. Searching, crawling and ingesting public reporting…",
@@ -119,9 +116,11 @@ export default function AskPage() {
       <p className="kicker">Mode A · Graph-RAG</p>
       <h2>Ask the graph</h2>
       <p className="lede">
-        {isAdmin
-          ? "Ask any narcotics question. The graph is searched first (Voyage + Neo4j). If fewer than 10 on-topic chunks score at least 0.80, you can search the web (SearXNG), crawl pages, ingest them into Neo4j, then answer from the updated graph."
-          : "Ask any narcotics question against the existing Neo4j graph. Answers and sources come only from ingested reporting. Web crawl and ingest are admin-only."}
+        Ask any narcotics question. The graph is searched first (Voyage + Neo4j). If fewer than 10
+        on-topic chunks score at least 0.80, the system searches the web (SearXNG), crawls the top
+        pages (Scrapy), chunks and embeds them (Voyage), writes them into Neo4j, then answers and
+        draws connections from the updated graph. Switching tabs keeps this answer until you ask
+        again.
       </p>
       <form className="panel" onSubmit={onSubmit}>
         <textarea
@@ -130,16 +129,14 @@ export default function AskPage() {
           placeholder="Ask about a person, place, drug or case…"
         />
         <div className="row" style={{ marginTop: 12 }}>
-          {isAdmin && (
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={discover}
-                onChange={(e) => setAsk({ discover: e.target.checked })}
-              />
-              Allow web discovery if the graph has fewer than 10 high-confidence matches
-            </label>
-          )}
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={discover}
+              onChange={(e) => setAsk({ discover: e.target.checked })}
+            />
+            Allow web discovery if the graph has fewer than 10 high-confidence matches
+          </label>
           <button type="submit" disabled={loading || query.trim().length < 3}>
             {loading ? "Retrieving…" : "Ask"}
           </button>
@@ -153,11 +150,9 @@ export default function AskPage() {
           <p className="muted" style={{ margin: 0 }}>
             {pipeline || "Checking the knowledge graph…"}
           </p>
-          {isAdmin && (
-            <p className="muted" style={{ margin: 0 }}>
-              If web discovery runs, the answer appears after search, crawl, ingest and the final graph query finish.
-            </p>
-          )}
+          <p className="muted" style={{ margin: 0 }}>
+            The answer will appear only after search, crawl, ingest and the final graph query finish.
+          </p>
         </div>
       )}
       {!loading && result && (
@@ -165,7 +160,7 @@ export default function AskPage() {
           <div className="panel">
             <div className="row" style={{ marginBottom: 12 }}>
               <span className={`pill ${result.sufficient ? "ok" : "warn"}`}>
-                {result.sufficient ? "Graph · ≥10 hits at ≥0.80" : isAdmin ? "Below gate · web discovery" : "Below gate · graph only"}
+                {result.sufficient ? "Graph · ≥10 hits at ≥0.80" : "Below gate · web discovery"}
               </span>
               <span className="pill">{result.retrieval_mode}</span>
               <span className="muted">

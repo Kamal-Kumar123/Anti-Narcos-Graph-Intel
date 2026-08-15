@@ -1,12 +1,11 @@
 """Cytoscape-ready graph payloads plus the original neighbourhood walk."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.db.neo4j_client import neo4j_client
 from app.db.schema import graph_stats
-from app.deps import get_current_user
 
-router = APIRouter(prefix="/api/graph", tags=["graph"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 NETWORK_QUERY = """
 MATCH (k:Case)

@@ -76,27 +76,6 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     log_level: str = "INFO"
 
-    # --- Auth (JWT) ---
-    jwt_secret: str = ""
-    jwt_expire_hours: int = 24
-    otp_expire_minutes: int = 10
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = "Narco-Graph Intel <noreply@localhost>"
-    # HTTPS email for Render (SMTP ports 587/465 are blocked on many hosts).
-    resend_api_key: str = ""
-    resend_from: str = "Narco-Graph Intel <onboarding@resend.dev>"
-
-    @property
-    def smtp_configured(self) -> bool:
-        return bool((self.smtp_host or "").strip() and (self.smtp_user or "").strip() and (self.smtp_password or "").strip())
-
-    @property
-    def resend_configured(self) -> bool:
-        return bool((self.resend_api_key or "").strip())
-
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -104,10 +83,6 @@ class Settings(BaseSettings):
     @property
     def search_providers(self) -> list[str]:
         return [p.strip() for p in self.search_provider_order.split(",") if p.strip()]
-
-    @property
-    def jwt_configured(self) -> bool:
-        return len((self.jwt_secret or "").strip()) >= 16
 
     @property
     def neo4j_configured(self) -> bool:
