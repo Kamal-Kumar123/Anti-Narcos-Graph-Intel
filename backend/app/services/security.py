@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
 import bcrypt
+import httpx
 import jwt
 
 from app.config import settings
@@ -69,55 +70,102 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, _secret(), algorithms=[ALGO])
 
 
-def send_otp_email(to_email: str, otp: str, name: str) -> None:
-    """Send the signup OTP. If SMTP is not configured, log it for local use."""
-    body = (
+def _otp_body(name: str, otp: str) -> tuple[str, str]:
+    text = (
         f"Hello {name},\n\n"
         f"Your Narco-Graph Intel verification code is {otp}.\n"
         f"It expires in {settings.otp_expire_minutes} minutes.\n\n"
         "If you did not create this account, ignore this message.\n"
     )
-    if not settings.smtp_configured:
-        logger.info("OTP for %s (SMTP not configured; local only): %s", to_email, otp)
-        return
+    html = (
+        f"<p>Hello {name},</p>"
+        f"<p>Your Narco-Graph Intel verification code is "
+        f"<strong style='font-size:20px;letter-spacing:4px'>{otp}</strong>.</p>"
+        f"<p>It expires in {settings.otp_expire_minutes} minutes.</p>"
+        "<p>If you did not create this account, ignore this message.</p>"
+    )
+    return text, html
 
+
+def _log_otp_fallback(to_email: str, otp: str, reason: str) -> None:
+    logger.warning(
+        "OTP delivery fallback (%s). Code for %s: %s",
+        reason,
+        to_email,
+        otp,
+    )
+
+
+def _send_via_resend(to_email: str, subject: str, text: str, html: str) -> None:
+    response = httpx.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {settings.resend_api_key.strip()}"},
+        json={
+            "from": settings.resend_from.strip(),
+            "to": [to_email],
+            "subject": subject,
+            "text": text,
+            "html": html,
+        },
+        timeout=20.0,
+    )
+    response.raise_for_status()
+
+
+def _send_via_smtp(to_email: str, subject: str, text: str, html: str) -> None:
     sender = (settings.smtp_from or "").strip() or settings.smtp_user
     message = EmailMessage()
-    message["Subject"] = "Narco-Graph Intel verification code"
+    message["Subject"] = subject
     message["From"] = sender
     message["To"] = to_email
-    message.set_content(body)
-    message.add_alternative(
-        (
-            f"<p>Hello {name},</p>"
-            f"<p>Your Narco-Graph Intel verification code is "
-            f"<strong style='font-size:20px;letter-spacing:4px'>{otp}</strong>.</p>"
-            f"<p>It expires in {settings.otp_expire_minutes} minutes.</p>"
-            "<p>If you did not create this account, ignore this message.</p>"
-        ),
-        subtype="html",
-    )
+    message.set_content(text)
+    message.add_alternative(html, subtype="html")
 
     host = settings.smtp_host.strip()
     port = settings.smtp_port
     user = settings.smtp_user.strip()
     password = settings.smtp_password.replace(" ", "")
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=20) as smtp:
-                smtp.login(user, password)
-                smtp.send_message(message)
-        else:
-            with smtplib.SMTP(host, port, timeout=20) as smtp:
-                smtp.starttls()
-                smtp.login(user, password)
-                smtp.send_message(message)
-    except smtplib.SMTPAuthenticationError as exc:
-        logger.exception("SMTP login failed")
-        raise RuntimeError(
-            "SMTP login failed. For Gmail use an App Password, not your normal password."
-        ) from exc
-    except (smtplib.SMTPException, OSError) as exc:
-        logger.exception("SMTP send failed")
-        raise RuntimeError(f"Could not send OTP email: {exc}") from exc
-    logger.info("OTP emailed to %s", to_email)
+    if port == 465:
+        with smtplib.SMTP_SSL(host, port, timeout=20) as smtp:
+            smtp.login(user, password)
+            smtp.send_message(message)
+    else:
+        with smtplib.SMTP(host, port, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(user, password)
+            smtp.send_message(message)
+
+
+def send_otp_email(to_email: str, otp: str, name: str) -> None:
+    """Send OTP via Resend (HTTPS) or SMTP. Falls back to logs if delivery fails."""
+    subject = "Narco-Graph Intel verification code"
+    text, html = _otp_body(name, otp)
+
+    if settings.resend_configured:
+        try:
+            _send_via_resend(to_email, subject, text, html)
+            logger.info("OTP emailed to %s via Resend", to_email)
+            return
+        except httpx.HTTPError as exc:
+            logger.exception("Resend send failed")
+            if not settings.smtp_configured:
+                _log_otp_fallback(to_email, otp, f"Resend failed: {exc}")
+                return
+
+    if settings.smtp_configured:
+        try:
+            _send_via_smtp(to_email, subject, text, html)
+            logger.info("OTP emailed to %s via SMTP", to_email)
+            return
+        except smtplib.SMTPAuthenticationError as exc:
+            logger.exception("SMTP login failed")
+            raise RuntimeError(
+                "SMTP login failed. For Gmail use an App Password, not your normal password."
+            ) from exc
+        except (smtplib.SMTPException, OSError) as exc:
+            # Render and many cloud hosts block outbound SMTP ports.
+            logger.exception("SMTP send failed")
+            _log_otp_fallback(to_email, otp, f"SMTP blocked or unreachable: {exc}")
+            return
+
+    _log_otp_fallback(to_email, otp, "no email provider configured")

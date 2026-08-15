@@ -26,10 +26,12 @@ async def lifespan(_: FastAPI):
         await ensure_schema()
     except Exception as exc:  # noqa: BLE001
         logger.error("Startup could not initialise Neo4j: %s", exc)
-    if settings.smtp_configured:
+    if settings.resend_configured:
+        logger.info("OTP email: Resend HTTPS")
+    elif settings.smtp_configured:
         logger.info("OTP email: SMTP %s as %s", settings.smtp_host, settings.smtp_user)
     else:
-        logger.warning("OTP email: SMTP is not configured; codes will be logged only")
+        logger.warning("OTP email: not configured; codes will be logged only")
     yield
     await embedder.close()
     await neo4j_client.close()

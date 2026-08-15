@@ -85,10 +85,17 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "Narco-Graph Intel <noreply@localhost>"
+    # HTTPS email for Render (SMTP ports 587/465 are blocked on many hosts).
+    resend_api_key: str = ""
+    resend_from: str = "Narco-Graph Intel <onboarding@resend.dev>"
 
     @property
     def smtp_configured(self) -> bool:
         return bool((self.smtp_host or "").strip() and (self.smtp_user or "").strip() and (self.smtp_password or "").strip())
+
+    @property
+    def resend_configured(self) -> bool:
+        return bool((self.resend_api_key or "").strip())
 
     @property
     def cors_origin_list(self) -> list[str]:
