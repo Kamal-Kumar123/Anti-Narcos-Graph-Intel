@@ -1,1 +1,0 @@
-1. How you calculate prbability of 0.8 ?
